@@ -26,3 +26,8 @@ Thumbs.db
 # Release artifacts (not tracked)
 .create_release.py
 .release_notes.md
+Dockerfile
+docker-compose.yml
+docker_launcher.py
+data/
+.env
