@@ -348,6 +348,51 @@ def reset_chat_agent():
     import supervisor.workers as _w
     _w._chat_agent = None
 
+
+# ----------------------------
+# 6.4) Web interface server
+# ----------------------------
+_tunnel_url = None
+try:
+    import threading as _threading
+    import asyncio as _asyncio
+    import supervisor.webserver as _webserver_mod
+    import supervisor.tunnel as _tunnel_mod
+
+    _webserver_mod.init(
+        drive_root=DRIVE_ROOT,
+        repo_dir=REPO_DIR,
+        send_message_cb=lambda msg: enqueue_task(msg, source='web'),
+        port=7860,
+    )
+
+    def _run_webserver():
+        loop = _asyncio.new_event_loop()
+        _asyncio.set_event_loop(loop)
+        _webserver_mod.set_event_loop(loop)
+        loop.run_until_complete(_webserver_mod.start_server(port=7860))
+        loop.run_forever()
+
+    _web_thread = _threading.Thread(target=_run_webserver, daemon=True, name='webserver')
+    _web_thread.start()
+    log.info('Web server started on port 7860')
+
+    _tunnel_mod.init(drive_root=DRIVE_ROOT, repo_dir=REPO_DIR)
+    _tunnel_url = _tunnel_mod.start_tunnel(port=7860)
+    if _tunnel_url:
+        _st = load_state()
+        if _st.get('owner_chat_id'):
+            send_with_budget(
+                int(_st['owner_chat_id']),
+                f'🌐 Web interface live: {_tunnel_url}',
+            )
+        log.info(f'Web interface: {_tunnel_url}')
+    else:
+        log.info('Web server running on port 7860 (no public tunnel available)')
+except Exception as _web_err:
+    log.warning(f'Web server failed to start: {_web_err}', exc_info=True)
+    _tunnel_url = None
+
 # ----------------------------
 # 7) Main loop
 # ----------------------------
