@@ -1,10 +1,4 @@
-"""
-Ouroboros — Tool package (plugin architecture).
+from .registry import ToolRegistry, ToolContext, ToolEntry, ToolCall
 
-Re-exports: ToolRegistry, ToolContext, ToolEntry.
-To add a tool: create a module in this package, export get_tools().
-"""
-
-from ouroboros.tools.registry import ToolRegistry, ToolContext, ToolEntry
-
-__all__ = ['ToolRegistry', 'ToolContext', 'ToolEntry']
+def get_tools():
+    return ToolRegistry.get_instance().get_all_tools()
