@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const statusElement = document.getElementById('status');
   const identityElement = document.getElementById('identity-content');
+  const thoughtsElement = document.getElementById('thoughts-content');
 
   const updateDashboard = () => {
     fetch('/ouroboros/api/status.json')
@@ -15,9 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         
         identityElement.textContent = data.identity_snapshot;
+        thoughtsElement.textContent = data.thought_process || 'No thoughts recorded';
       })
       .catch(error => {
         statusElement.innerHTML = `<h2>Status</h2><p class="error">Error loading status: ${error.message}</p>`;
+        thoughtsElement.textContent = 'Failed to load thought process';
       });
   };
 
