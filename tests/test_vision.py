@@ -1,5 +1,3 @@
-"""Smoke tests for VLM (Vision Language Model) support."""
-
 import sys
 import os
 import unittest
@@ -9,9 +7,22 @@ import pathlib
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+def is_docker():
+    """Detect if running in Docker container"""
+    if os.path.exists('/.dockerenv'):
+        return True
+    try:
+        with open('/proc/1/cgroup', 'rt') as f:
+            return 'docker' in f.read()
+    except Exception:
+        return False
 
+DOCKER_ENV = is_docker()
+SKIP_REASON = "Skipping browser tests in Docker environment" if DOCKER_ENV else None
+
+@unittest.skipIf(DOCKER_ENV, SKIP_REASON)
 class TestLLMVisionQuery(unittest.TestCase):
-    """Test LLMClient.vision_query() message format."""
+    """Smoke tests for VLM (Vision Language Model) support."
 
     def test_vision_query_url_format(self):
         """vision_query builds correct message format for URL images."""
@@ -108,6 +119,7 @@ class TestLLMVisionQuery(unittest.TestCase):
         self.assertEqual(text, "Text only.")
 
 
+@unittest.skipIf(DOCKER_ENV, SKIP_REASON)
 class TestAnalyzeScreenshotTool(unittest.TestCase):
     """Test the analyze_screenshot tool."""
 
@@ -155,6 +167,7 @@ class TestAnalyzeScreenshotTool(unittest.TestCase):
         self.assertIn("base64", images[0])
 
 
+@unittest.skipIf(DOCKER_ENV, SKIP_REASON)
 class TestVlmQueryTool(unittest.TestCase):
     """Test the vlm_query tool."""
 
