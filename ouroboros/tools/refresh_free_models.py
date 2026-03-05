@@ -3,6 +3,7 @@ import json
 import time
 import logging
 from typing import Dict, List, Tuple
+from ouroboros.llm import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +13,7 @@ FREE_MODEL_KEYWORDS = ['free', 'community', 'open']
 def test_model(model_id: str) -> bool:
     """Test if model responds properly to simple query"""
     try:
-        from ouroboros.llm import get_openrouter_client
-        client = get_openrouter_client()
+        client = OpenRouterClient()
         response = client.chat.completions.create(
             model=model_id,
             messages=[{"role": "user", "content": "Respond with 'OK'"}],
@@ -28,30 +28,32 @@ class ModelHealthMonitor:
     def __init__(self):
         self.free_models = []
         self.last_update = 0
-        self.health_log = os.path.join(os.getenv('DRIVE_ROOT', '/app/data'), 'logs/model_health.jsonl')
-    
+        
+    def get_health_log_path(self):
+        drive_root = os.getenv('DRIVE_ROOT', '/app/data')
+        return os.path.join(drive_root, 'logs/model_health.jsonl')
+
+    def get_api_path(self):
+        repo_dir = os.getenv('REPO_DIR', '/app')
+        return os.path.join(repo_dir, 'webapp/api/models')
+
     def refresh_available_models(self) -> List[Dict]:
         """Fetch all models and filter free ones"""
-        from ouroboros.llm import get_openrouter_client
-        client = get_openrouter_client()
+        client = OpenRouterClient()
         response = client.models.list()
         
         free_models = [
             m for m in response.models 
             if any(kw in m['id'].lower() for kw in FREE_MODEL_KEYWORDS)
         ]
-        
         return free_models
-    
+
     def update_working_models(self) -> Dict[str, List[str]]:
         """Refresh working model list and update env variables"""
         start_time = time.time()
         free_models = self.refresh_available_models()
-        working_models = {
-            'light': [],
-            'fallback': []
-        }
-        
+        working_models = {"light": [], "fallback": []}
+
         for model in free_models:
             if test_model(model['id']):
                 working_models['light'].append(model['id'])
@@ -62,8 +64,8 @@ class ModelHealthMonitor:
             os.environ['OUROBOROS_MODEL_LIGHT'] = working_models['light'][0]
         if working_models['fallback']:
             os.environ['OUROBOROS_MODEL_FALLBACK_LIST'] = ','.join(working_models['fallback'])
-        
-        # Log results
+
+        # Create log
         log_entry = {
             'timestamp': time.time(),
             'total_free': len(free_models),
@@ -71,13 +73,15 @@ class ModelHealthMonitor:
             'models': working_models['fallback'],
             'duration': time.time() - start_time
         }
-        
-        os.makedirs(os.path.dirname(self.health_log), exist_ok=True)
-        with open(self.health_log, 'a') as f:
+
+        # Write to health log
+        log_path = self.get_health_log_path()
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
             
         return working_models
-    
+
     def write_dashboard_status(self):
         """Write current model status to dashboard API endpoint"""
         working_models = self.update_working_models()
@@ -87,8 +91,8 @@ class ModelHealthMonitor:
             'fallback_list': os.getenv('OUROBOROS_MODEL_FALLBACK_LIST', '').split(','),
             'working_count': len(working_models['fallback'])
         }
-        
-        api_path = os.path.join(os.getenv('REPO_DIR', '/app'), 'webapp/api/models')
+
+        api_path = self.get_api_path()
         os.makedirs(os.path.dirname(api_path), exist_ok=True)
         with open(api_path, 'w') as f:
             json.dump(status, f)
@@ -99,3 +103,14 @@ def refresh_free_models():
     monitor = ModelHealthMonitor()
     monitor.write_dashboard_status()
     return {'status': 'success', 'message': 'Model health check completed'}
+
+def get_tools():
+    return [{
+        "name": "refresh_free_models",
+        "description": "Refresh free model list and update environment variables",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    }]
