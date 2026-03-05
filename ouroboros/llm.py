@@ -1,12 +1,3 @@
-"""
-Ouroboros — LLM client.
-
-The only module that communicates with the LLM API (OpenRouter).
-Contract: chat(), default_model(), available_models(), add_usage().
-"""
-
-from __future__ import annotations
-
 import logging
 import os
 import time
@@ -14,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
+DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"
 DEFAULT_LIGHT_MODEL = "google/gemini-3-pro-preview"
 
 
@@ -100,7 +92,6 @@ def fetch_openrouter_pricing() -> Dict[str, Tuple[float, float, float]]:
     except (requests.RequestException, ValueError, KeyError) as e:
         log.warning(f"Failed to fetch OpenRouter pricing: {e}")
         return {}
-
 
 class LLMClient:
     """OpenRouter API wrapper. All LLM calls go through this class."""
@@ -280,11 +271,11 @@ class LLMClient:
 
     def default_model(self) -> str:
         """Return the single default model from env. LLM switches via tool if needed."""
-        return os.environ.get("OUROBOROS_MODEL", "anthropic/claude-sonnet-4.6")
+        return os.environ.get("OUROBOROS_MODEL", DEFAULT_MODEL)
 
     def available_models(self) -> List[str]:
         """Return list of available models from env (for switch_model tool schema)."""
-        main = os.environ.get("OUROBOROS_MODEL", "anthropic/claude-sonnet-4.6")
+        main = os.environ.get("OUROBOROS_MODEL", DEFAULT_MODEL)
         code = os.environ.get("OUROBOROS_MODEL_CODE", "")
         light = os.environ.get("OUROBOROS_MODEL_LIGHT", "")
         models = [main]
