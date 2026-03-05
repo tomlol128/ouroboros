@@ -3,7 +3,7 @@ import os
 import pathlib
 import subprocess
 import hashlib
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timezone
 import json
 
@@ -20,14 +20,14 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-def safe_relpath(path: pathlib.Path, base: Optional[pathlib.Path] = None) -> pathlib.Path:
-    """Safely calculate relative path without going above base directory."""
-    base = base or pathlib.Path.cwd()
+def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> pathlib.Path:
+    """Safely calculate relative path with automatic Path conversion."""
+    path_obj = pathlib.Path(path)
+    base_obj = pathlib.Path(base) if base else pathlib.Path.cwd()
     try:
-        return path.relative_to(base)
+        return path_obj.relative_to(base_obj)
     except ValueError:
-        # If path is not under base, return absolute path to avoid security issues
-        return path
+        return path_obj
 
 def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
     """Run shell command and return stdout."""
@@ -68,19 +68,19 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def read_text(path: pathlib.Path) -> str:
+def read_text(path: Union[str, pathlib.Path]) -> str:
     """Read UTF-8 text file."""
-    return path.read_text(encoding="utf-8")
+    return pathlib.Path(path).read_text(encoding="utf-8")
 
 
-def write_text(path: pathlib.Path, content: str) -> None:
+def write_text(path: Union[str, pathlib.Path], content: str) -> None:
     """Write UTF-8 text file."""
-    path.write_text(content, encoding="utf-8")
+    pathlib.Path(path).write_text(content, encoding="utf-8")
 
 
-def append_jsonl(path: pathlib.Path, data: dict) -> None:
+def append_jsonl(path: Union[str, pathlib.Path], data: dict) -> None:
     """Append JSON object to .jsonl file."""
-    with path.open("a", encoding="utf-8") as f:
+    with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(data) + "\n")
 
 
