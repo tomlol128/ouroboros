@@ -6,6 +6,7 @@ import hashlib
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timezone
 import json
+import re
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -21,13 +22,19 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> str:
-    """Safely calculate relative path as string, handling both str and Path inputs."""
-    path_obj = pathlib.Path(path)
-    base_obj = pathlib.Path(base) if base else pathlib.Path.cwd()
+    """Safe relative path calculation with strict path traversal prevention."""
+    path_obj = pathlib.Path(path).resolve()
+    base_obj = pathlib.Path(base).resolve() if base else pathlib.Path.cwd().resolve()
+
+    # Check for path traversal
     try:
-        return str(path_obj.relative_to(base_obj))
+        _ = path_obj.relative_to(base_obj)
     except ValueError:
-        return str(path_obj)
+        raise ValueError(f"Path '{path}' is outside base directory '{base_obj}'")
+
+    rel = str(path_obj.relative_to(base_obj))
+    # Ensure no leading slashes
+    return rel.lstrip('/\\')
 
 def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
     """Run shell command and return stdout."""
@@ -75,12 +82,15 @@ def read_text(path: Union[str, pathlib.Path]) -> str:
 
 def write_text(path: Union[str, pathlib.Path], content: str) -> None:
     """Write UTF-8 text file."""
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     pathlib.Path(path).write_text(content, encoding="utf-8")
 
 
 def append_jsonl(path: Union[str, pathlib.Path], data: dict) -> None:
     """Append JSON object to .jsonl file."""
-    with open(path, "a", encoding="utf-8") as f:
+    p = pathlib.Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8") as f:
         f.write(json.dumps(data) + "\n")
 
 
