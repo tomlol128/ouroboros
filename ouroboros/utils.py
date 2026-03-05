@@ -20,8 +20,9 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-def safe_relpath(path: pathlib.Path, base: pathlib.Path) -> pathlib.Path:
+def safe_relpath(path: pathlib.Path, base: Optional[pathlib.Path] = None) -> pathlib.Path:
     """Safely calculate relative path without going above base directory."""
+    base = base or pathlib.Path.cwd()
     try:
         return path.relative_to(base)
     except ValueError:
@@ -53,6 +54,15 @@ def short(s: str, length: int = 7) -> str:
     return hashlib.sha256(s.encode()).hexdigest()[:length]
 
 
+def sanitize_task_for_event(task: dict) -> dict:
+    """Sanitize task data for event logging."""
+    if "content" in task:
+        task["content"] = "<redacted>"
+    if "prompt" in task:
+        task["prompt"] = clip_text(task["prompt"], 200)
+    return task
+
+
 def utc_now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
     return datetime.now(timezone.utc).isoformat()
@@ -82,7 +92,7 @@ def clip_text(text: str, max_len: int) -> str:
     cut = text.rfind('. ', 0, max_len)
     if cut > 0:
         return text[:cut+1]
-    return text[:max_len] + "..."
+    return text[:max_len] + '...(truncated)...'
 
 
 def sanitize_tool_args_for_log(args: dict) -> dict:
