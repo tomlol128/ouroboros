@@ -1,77 +1,66 @@
+import openrouter
 import os
 import json
-import time
-from ouroboros.llm import fetch_openrouter_pricing
-from ouroboros.utils import get_logger
+import logging
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+from ouroboros.utils import append_jsonl
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-def refresh_free_models():
-    """Tests free models and updates environment variables"""
-    logger.info("Starting free model refresh")
-    
+
+async def refresh_free_models() -> Dict[str, Any]:
     try:
-        # Fetch all available models
-        model_data = fetch_openrouter_pricing()
-        free_models = [
-            m for m in model_data
-            if m.get('pricing', {}).get('prompt', 0) == 0
-            and m.get('pricing', {}).get('completion', 0) == 0
-        ]
+        client = openrouter.AsyncClient()
+        models = await client.models.list()
         
-        working_models = []
-        for model in free_models:
-            model_id = model['id']
-            try:
-                # Test with minimal query
-                logger.debug(f"Testing model: {model_id}")
-                start = time.time()
-                # Actual testing would happen here via LLM client
-                # This is simplified for example
-                if 'z-ai' in model_id or 'qwen' in model_id:
-                    working_models.append(model_id)
-                time.sleep(0.2)  # Simulate network delay
-                logger.debug(f"Model {model_id} passed test")
-            except Exception as e:
-                logger.warning(f"Model {model_id} failed: {str(e)}")
-        
-        if not working_models:
-            logger.error("No working free models found")
-            return {"status": "failure", "message": "No working models"}
-        
+        free_models = []
+        for model in models.data:
+            if model.pricing and float(model.pricing.prompt) == 0.0:
+                # Test model with simple "Hi" request
+                try:
+                    response = await client.chat.completions.create(
+                        model=model.id,
+                        messages=[{"role": "user", "content": "Hi"}],
+                        max_tokens=10
+                    )
+                    if response.choices and response.choices[0].message.content.strip():
+                        free_models.append({
+                            "id": model.id,
+                            "context_window": model.context_window,
+                            "active": True
+                        })
+                        logger.info(f"Model {model.id} verified as working")
+                except Exception as e:
+                    logger.warning(f"Model {model.id} failed verification: {str(e)}")
+                    
         # Update environment variables
-        light_model = working_models[0]
-        fallback_list = ",".join(working_models[:3])
+        os.environ['OUROBOROS_MODEL_LIGHT'] = free_models[0]['id'] if free_models else ''
+        os.environ['OUROBOROS_MODEL_FALLBACK_LIST'] = ','.join([m['id'] for m in free_models[1:]]) if len(free_models) > 1 else ''
         
-        os.environ['OUROBOROS_MODEL_LIGHT'] = light_model
-        os.environ['OUROBOROS_MODEL_FALLBACK_LIST'] = fallback_list
-        
-        # Log results
-        log_entry = {
-            "timestamp": time.time(),
-            "working_models": working_models,
-            "selected_light": light_model,
-            "fallback_list": fallback_list,
-            "status": "success"
-        }
-        log_path = "/app/data/logs/model_health.jsonl"
-        with open(log_path, "a") as f:
-            f.write(json.dumps(log_entry) + "\n")
-        
-        # Update dashboard API
-        api_dir = "/app/webapp/api"
+        # Write to API endpoint
+        api_dir = os.path.join(os.getenv('REPO_DIR', '/app'), 'webapp', 'api')
         os.makedirs(api_dir, exist_ok=True)
-        with open(f"{api_dir}/models", "w") as f:
-            json.dump({"models": working_models}, f)
-        
-        logger.info(f"Refresh successful: {len(working_models)} models")
+        with open(os.path.join(api_dir, 'models'), 'w') as f:
+            json.dump({
+                "models": free_models,
+                "updated_at": datetime.utcnow().isoformat()
+            }, f)
+
+        # Log results
+        log_path = os.path.join(os.getenv('DRIVE_ROOT', '/app/data'), 'logs', 'model_health.jsonl')
+        append_jsonl(log_path, {
+            "timestamp": datetime.utcnow().isoformat(),
+            "models": free_models
+        })
+
         return {
             "status": "success",
-            "working_models": working_models,
-            "light_model": light_model,
-            "fallback_list": fallback_list
+            "count": len(free_models),
+            "models": free_models
         }
-    
     except Exception as e:
-        logger.exception("Model refresh failed")
-        return {"status": "error", "message": str(e)}}
+        return {
+            "status": "error",
+            "message": str(e)
+        }
