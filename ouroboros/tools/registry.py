@@ -23,12 +23,12 @@ class ToolRegistry:
     _instance = None
 
     @classmethod
-    def get_instance(cls) -> 'ToolRegistry':
+    def get_instance(cls, **kwargs) -> 'ToolRegistry':
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(**kwargs)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tools: Dict[str, ToolEntry] = {}
         self._load_modules()
 
