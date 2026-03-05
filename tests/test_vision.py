@@ -22,7 +22,7 @@ SKIP_REASON = "Skipping browser tests in Docker environment" if DOCKER_ENV else 
 
 @unittest.skipIf(DOCKER_ENV, SKIP_REASON)
 class TestLLMVisionQuery(unittest.TestCase):
-    """Smoke tests for VLM (Vision Language Model) support."
+    """Smoke tests for VLM (Vision Language Model) support."""
 
     def test_vision_query_url_format(self):
         """vision_query builds correct message format for URL images."""
