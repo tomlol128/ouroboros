@@ -14,6 +14,10 @@ class PathTraversalError(Exception):
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
+def sanitize_tool_result_for_log(result: str, max_len: int = 500) -> str:
+    """Clean tool results for logging"""
+    return truncate_for_log(result, max_len)
+
 def utc_now_iso() -> str:
     """Return current UTC time in ISO 8601 format"""
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
