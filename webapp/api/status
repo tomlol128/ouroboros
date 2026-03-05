@@ -1,0 +1,10 @@
+{
+  "version": "6.2.0",
+  "budget_total": 25.0,
+  "budget_remaining": 15.0,
+  "spent_usd": 9.98,
+  "status": "active",
+  "last_updated": "2026-03-05T01:12:28.740654+00:00",
+  "git_sha": "2c7a0ef1aa2b93d6f94c25f432524ab89e6a76c8",
+  "owner_id": 6384839133
+}
