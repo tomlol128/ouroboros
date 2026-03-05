@@ -1,7 +1,9 @@
 import logging
 import os
 import pathlib
-from typing import Optional
+import subprocess
+import hashlib
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import json
 
@@ -25,6 +27,30 @@ def safe_relpath(path: pathlib.Path, base: pathlib.Path) -> pathlib.Path:
     except ValueError:
         # If path is not under base, return absolute path to avoid security issues
         return path
+
+def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
+    """Run shell command and return stdout."""
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
+    return result.stdout
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimation (1 token ≈ 4 chars in English)."""
+    return max(1, len(text) // 4)
+
+
+def get_git_info(repo_path: str) -> Dict[str, str]:
+    """Get current git branch and SHA."""
+    try:
+        sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_path).strip().decode()
+        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=repo_path).strip().decode()
+        return {'sha': sha, 'branch': branch}
+    except Exception as e:
+        return {'error': str(e)}
+
+def short(s: str, length: int = 7) -> str:
+    """Create short hash of string."""
+    return hashlib.sha256(s.encode()).hexdigest()[:length]
 
 
 def utc_now_iso() -> str:
