@@ -1,5 +1,4 @@
 import logging
-from ouroboros.loop import run_llm_loop  # Correct import from loop.py
 from ouroboros.loop import run_loop
 from ouroboros.context import Context
 from ouroboros.utils import sanitize_input, safe_relpath
@@ -20,4 +19,4 @@ class Agent:
     def process_message(self, message):
         sanitized = sanitize_input(message)
         self.context.add_message("user", sanitized)
-        return run_llm_loop(self.context, self.tools)
+        return run_loop(self.context, self.tools, single_turn=True)
