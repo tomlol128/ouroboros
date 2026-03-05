@@ -3,6 +3,7 @@ import os
 import pathlib
 from typing import Optional
 from datetime import datetime, timezone
+import json
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -15,6 +16,15 @@ def get_logger(name: str) -> logging.Logger:
         logger.addHandler(handler)
         logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
     return logger
+
+
+def safe_relpath(path: pathlib.Path, base: pathlib.Path) -> pathlib.Path:
+    """Safely calculate relative path without going above base directory."""
+    try:
+        return path.relative_to(base)
+    except ValueError:
+        # If path is not under base, return absolute path to avoid security issues
+        return path
 
 
 def utc_now_iso() -> str:
