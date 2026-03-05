@@ -21,7 +21,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> str:
-    """Safely calculate relative path as string, falling back to absolute path when outside base."""
+    """Safe relative path calculation that strictly enforces base directory containment."""
     path_obj = pathlib.Path(path).resolve()
     base_obj = pathlib.Path(base).resolve() if base else pathlib.Path.cwd().resolve()
 
@@ -29,8 +29,7 @@ def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathl
         rel = path_obj.relative_to(base_obj)
         return str(rel).lstrip('/\\')
     except ValueError:
-        # Path is outside base, return absolute path relative to filesystem root
-        return str(path_obj.resolve())
+        raise ValueError(f"Path '{path}' is outside base directory '{base_obj}'")
 
 def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
     """Run shell command and return stdout."""
@@ -72,21 +71,21 @@ def utc_now_iso() -> str:
 
 
 def read_text(path: Union[str, pathlib.Path]) -> str:
-    """Read UTF-8 text file."""
+    """Read UTF-8 text file with automatic directory creation."""
     p = pathlib.Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     return p.read_text(encoding="utf-8")
 
 
 def write_text(path: Union[str, pathlib.Path], content: str) -> None:
-    """Write UTF-8 text file."""
+    """Write UTF-8 text file with automatic directory creation."""
     p = pathlib.Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
 
 
 def append_jsonl(path: Union[str, pathlib.Path], data: dict) -> None:
-    """Append JSON object to .jsonl file."""
+    """Append JSON object to .jsonl file with directory creation."""
     p = pathlib.Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:
@@ -94,18 +93,15 @@ def append_jsonl(path: Union[str, pathlib.Path], data: dict) -> None:
 
 
 def clip_text(text: str, max_len: int) -> str:
-    """Truncate text to max_len while attempting to preserve sentences."""
+    """Truncate text to max_len while preserving sentences."""
     if len(text) <= max_len:
         return text
-    # Try to cut at sentence boundary
     cut = text.rfind('. ', 0, max_len)
-    if cut > 0:
-        return text[:cut+1]
-    return text[:max_len] + '...(truncated)...'
+    return text[:cut+1] if cut > 0 else text[:max_len] + '...(truncated)...'
 
 
 def sanitize_tool_args_for_log(args: dict) -> dict:
-    """Remove sensitive data from tool args for logging."""
+    """Sanitize tool arguments for logging."""
     if "content" in args:
         args["content"] = "<redacted>"
     if "token" in args:
@@ -114,8 +110,7 @@ def sanitize_tool_args_for_log(args: dict) -> dict:
 
 
 def sanitize_tool_result_for_log(result: str) -> str:
-    """Redact sensitive info from tool results."""
-    # Example: hide API keys
+    """Sanitize tool results for logging."""
     return result.replace("sk-or-v1-", "sk-or-v1-<redacted>")
 
 
