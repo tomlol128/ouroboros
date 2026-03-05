@@ -1,57 +1,46 @@
 import os
+import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Dict, Any, Optional
 from ouroboros.context import Context
-from ouroboros.loop import run_llm_loop
-from ouroboros.memory import Memory
-from ouroboros.tools import get_tools
-from ouroboros.llm import LLMClient
-from ouroboros.utils import (
-    get_logger,
-    safe_relpath,
-    sanitize_tool_args_for_log,
-    sanitize_tool_result_for_log,
-    truncate_for_log
-)
+from ouroboros.loop import ToolLoop
+from ouroboros.tools.registry import ToolRegistry
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Agent:
-    """Main agent execution orchestrator."""
+    def __init__(self, context: Context):
+        self.context = context
+        self.tool_registry = ToolRegistry()
+        self.tool_loop = ToolLoop(
+            context=self.context,
+            available_tools=self.tool_registry.get_tools(),
+            max_rounds=10
+        )
 
-    def __init__(self, memory: Memory):
-        self.memory = memory
-        self.llm = LLMClient()
-        self.tools = get_tools()
-
-    def run(self, context: Optional[Context] = None) -> Dict[str, Any]:
-        """Run the main agent loop with context."""
-        if context is None:
-            context = Context(self.memory)
-
+    async def run(self):
         try:
-            # Build context and execute loop
-            context.build()
-            logger.info("Starting LLM loop")
-            result = run_llm_loop(
-                llm=self.llm,
-                context=context,
-                tools=self.tools
-            )
-            logger.info("LLM loop completed")
-            return result
+            result = await self.tool_loop.run()
+            return {
+                "status": "success",
+                "result": result
+            }
         except Exception as e:
             logger.exception("Agent execution failed")
-            raise
+            return {
+                "status": "error",
+                "message": str(e)
+            }
 
-    def handle_message(self, message: str) -> Dict[str, Any]:
-        """Process a single user message."""
-        self.memory.append_chat_message('user', message)
-        return self.run()
-
+async def main():
+    context = Context()
+    agent = Agent(context)
+    result = await agent.run()
+    
+    if result["status"] == "success":
+        print("Agent completed successfully")
+    else:
+        print(f"Agent failed: {result['message']}")
 
 if __name__ == "__main__":
-    # For standalone execution
-    memory = Memory()
-    agent = Agent(memory)
-    agent.run()
+    asyncio.run(main())
