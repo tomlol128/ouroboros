@@ -5,10 +5,13 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 class ToolEntry:
-    def __init__(self, name: str, description: str, parameters: Dict):
+    def __init__(self, name: str, description: str, parameters: Dict, **kwargs):
         self.name = name
         self.description = description
         self.parameters = parameters
+        # Store any additional metadata
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 class ToolContext:
     def __init__(self, **kwargs):
@@ -18,6 +21,14 @@ class ToolCall:
     def __init__(self, name: str, arguments: Dict):
         self.name = name
         self.arguments = arguments
+
+class ToolResult:
+    def __init__(self, call_id: str, tool_call: 'ToolCall', success: bool, content: str, error: Optional[str] = None):
+        self.call_id = call_id
+        self.tool_call = tool_call
+        self.success = success
+        self.content = content
+        self.error = error
 
 class ToolRegistry:
     _instance = None
@@ -31,6 +42,10 @@ class ToolRegistry:
     def __init__(self, **kwargs):
         self.tools: Dict[str, ToolEntry] = {}
         self._load_modules()
+
+    @property
+    def available_tools(self) -> Dict[str, ToolEntry]:
+        return self.tools
 
     def _load_modules(self):
         # Core tool modules are pre-registered
@@ -49,12 +64,14 @@ class ToolRegistry:
             try:
                 mod = importlib.import_module(f"ouroboros.tools.{modname}")
                 if hasattr(mod, 'get_tools'):
-                    tools = mod.get_tools()
-                    for tool in tools:
-                        self.tools[tool.name] = ToolEntry(
-                            name=tool.name,
-                            description=tool.description,
-                            parameters=tool.parameters
+                    for tool in mod.get_tools():
+                        # Remove special keys not part of ToolEntry
+                        tool_kwargs = {k: v for k, v in tool.items() if k not in ['name', 'description', 'parameters']}
+                        self.tools[tool['name']] = ToolEntry(
+                            name=tool['name'],
+                            description=tool['description'],
+                            parameters=tool['parameters'],
+                            **tool_kwargs
                         )
             except Exception as e:
                 logger.warning(f"Failed to load tool module {modname}", exc_info=True)
