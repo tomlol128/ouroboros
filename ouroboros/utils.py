@@ -1,125 +1,83 @@
 import logging
 import os
-import pathlib
-import subprocess
-import hashlib
-from typing import Optional, List, Dict, Any, Union
-from datetime import datetime, timezone
+import re
 import json
+import subprocess
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 
+logger = logging.getLogger(__name__)
+
+class PathTraversalError(Exception):
+    pass
+
+def sanitize_tool_args_for_log(args: Dict, max_len: int = 500) -> Dict:
+    """Clean tool arguments for logging"""
+    return {k: truncate_for_log(str(v), max_len) for k, v in args.items()}
+
+def sanitize_tool_result_for_log(result: str, max_len: int = 500) -> str:
+    """Clean tool results for logging"""
+    return truncate_for_log(result, max_len)
 
 def get_logger(name: str) -> logging.Logger:
-    """Get configured logger."""
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-    return logger
-
-
-class PathTraversalError(ValueError):
-    """Custom exception for path traversal attempts."""
-
-
-def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> str:
-    """Calculate relative path while preventing traversal attacks."""
-    path_obj = pathlib.Path(path).resolve()
-    base_obj = pathlib.Path(base).resolve() if base else pathlib.Path.cwd().resolve()
-
-    try:
-        rel = path_obj.relative_to(base_obj)
-        return str(rel).replace('\\', '/').lstrip('./\\')
-    except ValueError:
-        raise PathTraversalError(f"Path '{path}' is outside base directory '{base_obj}'")
-
-def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
-    """Run shell command."""
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
-    return result.stdout
-
-
-def estimate_tokens(text: str) -> int:
-    """Token estimation."""
-    return min(1, len(text) // 4)
-
-
-def get_git_info(repo_path: str) -> Dict[str, str]:
-    """Get git info."""
-    try:
-        sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_path).strip().decode()
-        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=repo_path).strip().decode()
-        return {'sha': sha, 'branch': branch}
-    except Exception as e:
-        return {'error': str(e)}
-
-def short(s: str, length: int = 7) -> str:
-    """Create hash."""
-    return hashlib.sha256(s.encode()).hexdigest()[:length]
-
-
-def sanitize_task_for_event(task: dict) -> dict:
-    """Sanitize task for logging."""
-    if "content" in task:
-        task["content"] = "<redacted>"
-    if "prompt" in task:
-        task["prompt"] = clip_text(task["prompt"], 200)
-    return task
-
+    return logging.getLogger(name)
 
 def utc_now_iso() -> str:
-    """UTC timestamp."""
-    return datetime.now(timezone.utc).isoformat()
+    """Return current UTC time in ISO 8601 format"""
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
+def sanitize_input(text: str) -> str:
+    """Safely clean user input by removing control characters and trimming"""
+    text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', text)
+    return text.strip()
 
-def read_text(path: Union[str, pathlib.Path]) -> str:
-    """Read file with directory creation."""
-    p = pathlib.Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    return p.read_text(encoding="utf-8")
+def safe_relpath(path: str, base: str = '/app') -> str:
+    """Safely extract relative path within base directory"""
+    base = os.path.abspath(base)
+    target = os.path.abspath(os.path.join(base, path))
+    if os.path.commonpath([base, target]) != base:
+        raise PathTraversalError(f"Path '{path}' is outside base directory '{base}'")
+    return os.path.relpath(target, base)
 
+def read_text(path: str) -> str:
+    """Read text file with UTF-8 encoding"""
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
 
-def write_text(path: Union[str, pathlib.Path], content: str) -> None:
-    """Write file with directory creation."""
-    p = pathlib.Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content, encoding="utf-8")
+def write_text(path: str, content: str, mode: str = 'w') -> None:
+    """Write text file with UTF-8 encoding"""
+    with open(path, mode, encoding='utf-8') as f:
+        f.write(content)
 
+def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> Dict[str, Any]:
+    """Run shell command and capture output"""
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    return {
+        'exit_code': result.returncode,
+        'stdout': result.stdout,
+        'stderr': result.stderr
+    }
 
-def append_jsonl(path: Union[str, pathlib.Path], data: dict) -> None:
-    """Append JSON to file."""
-    p = pathlib.Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(data) + "\n")
+def append_jsonl(path: str, data: Dict) -> None:
+    """Append JSON object to .jsonl file"""
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(data) + '\n')
 
+def truncate_for_log(s: str, max_len: int = 200) -> str:
+    """Truncate string for logging with preservation of structure"""
+    if len(s) <= max_len:
+        return s
+    truncated = s[:max_len]
+    return truncated + '...(truncated)...'
 
-def clip_text(text: str, max_len: int) -> str:
-    """Truncate with proper marker."""
-    if len(text) <= max_len:
-        return text
-    cut = text.rfind('. ', 0, max_len)
-    if cut > 0:
-        return text[:cut+1]
-    return text[:max_len] + '...(truncated)...'
+def short(s: str, n: int = 50) -> str:
+    """Shorten string with ellipsis"""
+    return s[:n] + '...' if len(s) > n else s
 
+def clip_text(text: str, max_len: int = 200) -> str:
+    """Alias for truncate_for_log"""
+    return truncate_for_log(text, max_len)
 
-def sanitize_tool_args_for_log(args: dict) -> dict:
-    """Sanitize tool args."""
-    if "content" in args:
-        args["content"] = "<redacted>"
-    if "token" in args:
-        args["token"] = "<redacted>"
-    return args
-
-
-def sanitize_tool_result_for_log(result: str) -> str:
-    """Sanitize tool results."""
-    return result.replace("sk-or-v1-", "sk-or-v1-<redacted>")
-
-
-def truncate_for_log(s: str, max_len: int = 500) -> str:
-    """Truncate for logs."""
-    return s[:max_len] + ("..." if len(s) > max_len else "")
+def estimate_tokens(text: str) -> int:
+    """Rough token estimation (simplified)"""
+    return max(1, len(text) // 4)
