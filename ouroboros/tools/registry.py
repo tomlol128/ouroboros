@@ -9,7 +9,6 @@ class ToolEntry:
         self.name = name
         self.description = description
         self.parameters = parameters
-        # Store any additional metadata
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -48,7 +47,6 @@ class ToolRegistry:
         return self.tools
 
     def _load_modules(self):
-        # Core tool modules are pre-registered
         core_modules = [
             'core',
             'git',
@@ -64,14 +62,19 @@ class ToolRegistry:
             try:
                 mod = importlib.import_module(f"ouroboros.tools.{modname}")
                 if hasattr(mod, 'get_tools'):
-                    for tool in mod.get_tools():
-                        # Remove special keys not part of ToolEntry
-                        tool_kwargs = {k: v for k, v in tool.items() if k not in ['name', 'description', 'parameters']}
-                        self.tools[tool['name']] = ToolEntry(
-                            name=tool['name'],
-                            description=tool['description'],
-                            parameters=tool['parameters'],
-                            **tool_kwargs
+                    for tool_entry in mod.get_tools():
+                        # Extract attributes from ToolEntry instance
+                        extra_attrs = {
+                            k: getattr(tool_entry, k)
+                            for k in dir(tool_entry)
+                            if not k.startswith('_')
+                            and k not in ['name', 'description', 'parameters']
+                        }
+                        self.tools[tool_entry.name] = ToolEntry(
+                            name=tool_entry.name,
+                            description=tool_entry.description,
+                            parameters=tool_entry.parameters,
+                            **extra_attrs
                         )
             except Exception as e:
                 logger.warning(f"Failed to load tool module {modname}", exc_info=True)
