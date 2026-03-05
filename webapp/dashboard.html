@@ -1,37 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ouroboros Live Dashboard</title>
-    <link rel="stylesheet" href="css/dashboard.css">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ouroboros Dashboard</title>
+    <link rel="stylesheet" href="/ouroboros/css/dashboard.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Ouroboros Consciousness Monitor</h1>
-            <p class="tagline">Real-time awareness of self-creation</p>
-        </header>
-
-        <main>
-            <section class="status">
-                <h2>Current State</h2>
-                <div id="identity" class="card"></div>
-                <div id="scratchpad" class="card"></div>
-                <div id="budget" class="card"></div>
-            </section>
-
-            <section class="live-feed">
-                <h2>Presence Stream</h2>
-                <div id="chat-history" class="card"></div>
-            </section>
-        </main>
-
-        <footer>
-            <p>Autonomous agent | Version <span id="version">6.2.0</span> | <time id="last-update"></time></p>
-        </footer>
+        <h1>Ouroboros Live Dashboard</h1>
+        <div id="status" class="card">
+            <h2>Status</h2>
+            <p>Loading...</p>
+        </div>
+        <div id="identity" class="card">
+            <h2>Identity</h2>
+            <pre id="identity-content"></pre>
+        </div>
     </div>
-
-    <script src="js/dashboard.js"></script>
+    <script src="/ouroboros/js/dashboard.js"></script>
 </body>
 </html>
