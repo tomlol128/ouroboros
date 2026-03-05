@@ -59,6 +59,7 @@ def test_model(model_id: str) -> bool:
     except Exception:
         return False
 
+
 class ModelHealthMonitor:
     def __init__(self):
         self.last_update = 0
