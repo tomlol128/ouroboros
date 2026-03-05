@@ -1,5 +1,5 @@
 import logging
-from ouroboros.llm import run_llm_loop  # Fixed import path
+from ouroboros.loop import run_llm_loop  # Correct import from loop.py
 from ouroboros.loop import run_loop
 from ouroboros.context import Context
 from ouroboros.utils import sanitize_input, safe_relpath
