@@ -1,25 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ouroboros Dashboard</title>
-    <link rel="stylesheet" href="/ouroboros/css/dashboard.css">
+  <meta charset="utf-8">
+  <title>Ouroboros Dashboard</title>
+  <link rel="stylesheet" href="/ouroboros/css/dashboard.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Ouroboros Live Dashboard</h1>
-        <div id="status" class="card">
-            <h2>Status</h2>
-            <p>Loading...</p>
-        </div>
-        <div id="identity" class="card">
-            <h2>Identity</h2>
-            <pre id="identity-content"></pre>
-        </div>
-        <div id="thoughts" class="card">
-            <h2>Thought Process</h2>
-            <pre id="thoughts-content"></pre>
-        </div>
+  <div class="container">
+    <h1>Ouroboros Dashboard</h1>
+
+    <!-- Status Card -->
+    <div id="status" class="card">
+      <h2>Status</h2>
+      <div id="status-content">Loading...</div>
     </div>
-    <script src="/ouroboros/js/dashboard.js"></script>
+
+    <!-- Identity Card -->
+    <div id="identity" class="card">
+      <h2>Identity</h2>
+      <div id="identity-content">Loading...</div>
+    </div>
+
+    <!-- Thoughts Card -->
+    <div id="thoughts" class="card">
+      <h2>Current Thoughts</h2>
+      <div id="thoughts-content">No current thoughts</div>
+    </div>
+
+    <!-- Tasks Card -->
+    <div id="tasks" class="card">
+      <h2>Active Tasks</h2>
+      <div id="tasks-content">No active tasks</div>
+    </div>
+
+  </div>
+
+  <script src="/ouroboros/js/dashboard.js"></script>
 </body>
 </html>
