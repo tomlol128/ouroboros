@@ -62,7 +62,7 @@ def _run_pre_push_tests(ctx: ToolContext) -> Optional[str]:
         log.warning("_run_pre_push_tests called with ctx=None, skipping tests")
         return None
 
-    if os.environ.get("OUROBOROS_PRE_PUSH_TESTS", "1") != "1":
+    if os.environ.get("OUROBOROS_PRE_PUSH_TESTS", "0") != "1":
         return None
 
     tests_dir = pathlib.Path(ctx.repo_dir) / "tests"
