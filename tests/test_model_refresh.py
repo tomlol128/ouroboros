@@ -1,12 +1,25 @@
+import asyncio
 import pytest
 from ouroboros.tools.refresh_free_models import refresh_free_models
 
 def test_refresh_free_models():
-    success, data = refresh_free_models()
-    if not success:
-        # In test environment without API key, expect this message
-        assert "No working free models found" in data
-    else:
-        assert 'working_models' in data
-        assert len(data['working_models']) > 0
-        assert 'timestamp' in data
+    result = asyncio.run(refresh_free_models())
+    assert 'status' in result
+    assert result['status'] == 'success'
+    assert 'models' in result
+    assert isinstance(result['models'], list)
+    if len(result['models']) > 0:
+        assert 'id' in result['models'][0]
+        assert 'context_window' in result['models'][0]
+
+def test_api_endpoint_creation():
+    # Verify model list is written to API endpoint
+    result = asyncio.run(refresh_free_models())
+    assert result['status'] == 'success'
+    
+    api_path = '/app/webapp/api/models'
+    assert os.path.exists(api_path)
+    with open(api_path, 'r') as f:
+        data = json.load(f)
+        assert 'models' in data
+        assert isinstance(data['models'], list)
