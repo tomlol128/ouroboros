@@ -3,7 +3,6 @@ import json
 import time
 import logging
 from typing import Dict, List, Tuple
-from openrouter import OpenRouter
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,8 @@ FREE_MODEL_KEYWORDS = ['free', 'community', 'open']
 def test_model(model_id: str) -> bool:
     """Test if model responds properly to simple query"""
     try:
-        client = OpenRouter(api_key=os.getenv('OPENROUTER_API_KEY'))
+        from ouroboros.llm import get_openrouter_client
+        client = get_openrouter_client()
         response = client.chat.completions.create(
             model=model_id,
             messages=[{"role": "user", "content": "Respond with 'OK'"}],
@@ -28,16 +28,17 @@ class ModelHealthMonitor:
     def __init__(self):
         self.free_models = []
         self.last_update = 0
-        self.health_log = 'data/logs/model_health.jsonl'
+        self.health_log = os.path.join(os.getenv('DRIVE_ROOT', '/app/data'), 'logs/model_health.jsonl')
     
     def refresh_available_models(self) -> List[Dict]:
         """Fetch all models and filter free ones"""
-        client = OpenRouter(api_key=os.getenv('OPENROUTER_API_KEY'))
-        models = client.models.list()
+        from ouroboros.llm import get_openrouter_client
+        client = get_openrouter_client()
+        response = client.models.list()
         
         free_models = [
-            m for m in models.data 
-            if any(kw in m.id.lower() for kw in FREE_MODEL_KEYWORDS)
+            m for m in response.models 
+            if any(kw in m['id'].lower() for kw in FREE_MODEL_KEYWORDS)
         ]
         
         return free_models
@@ -52,13 +53,15 @@ class ModelHealthMonitor:
         }
         
         for model in free_models:
-            if test_model(model.id):
-                working_models['light'].append(model.id)
-                working_models['fallback'].append(model.id)
+            if test_model(model['id']):
+                working_models['light'].append(model['id'])
+                working_models['fallback'].append(model['id'])
 
         # Update environment variables
-        os.environ['OUROBOROS_MODEL_LIGHT'] = working_models['light'][0] if working_models['light'] else ''
-        os.environ['OUROBOROS_MODEL_FALLBACK_LIST'] = ','.join(working_models['fallback']) if working_models['fallback'] else ''
+        if working_models['light']:
+            os.environ['OUROBOROS_MODEL_LIGHT'] = working_models['light'][0]
+        if working_models['fallback']:
+            os.environ['OUROBOROS_MODEL_FALLBACK_LIST'] = ','.join(working_models['fallback'])
         
         # Log results
         log_entry = {
@@ -69,6 +72,7 @@ class ModelHealthMonitor:
             'duration': time.time() - start_time
         }
         
+        os.makedirs(os.path.dirname(self.health_log), exist_ok=True)
         with open(self.health_log, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
             
@@ -84,7 +88,9 @@ class ModelHealthMonitor:
             'working_count': len(working_models['fallback'])
         }
         
-        with open('webapp/api/models', 'w') as f:
+        api_path = os.path.join(os.getenv('REPO_DIR', '/app'), 'webapp/api/models')
+        os.makedirs(os.path.dirname(api_path), exist_ok=True)
+        with open(api_path, 'w') as f:
             json.dump(status, f)
 
 
