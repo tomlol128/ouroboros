@@ -2,24 +2,44 @@ import os
 import json
 import time
 import logging
+import requests
 from typing import Dict, List, Tuple
-from ouroboros.llm import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
 FREE_MODEL_KEYWORDS = ['free', 'community', 'open']
+OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
+
+
+def get_openrouter_api_key() -> str:
+    return os.getenv('OPENROUTER_API_KEY', '')
 
 
 def test_model(model_id: str) -> bool:
     """Test if model responds properly to simple query"""
+    api_key = get_openrouter_api_key()
+    if not api_key:
+        logger.error("OPENROUTER_API_KEY missing")
+        return False
+
     try:
-        client = OpenRouterClient()
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=[{"role": "user", "content": "Respond with 'OK'"}],
-            max_tokens=5
+        response = requests.post(
+            f"{OPENROUTER_API_BASE}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "https://app-icerie.shop/",
+                "X-Title": "Ouroboros Dashboard"
+            },
+            json={
+                "model": model_id,
+                "messages": [{"role": "user", "content": "Respond with 'OK'"}],
+                "max_tokens": 5
+            },
+            timeout=10
         )
-        return 'ok' in response.choices[0].message.content.lower()
+        response.raise_for_status()
+        content = response.json()['choices'][0]['message']['content'].lower()
+        return 'ok' in content
     except Exception as e:
         logger.warning(f"Model {model_id} failed test: {str(e)}")
         return False
@@ -28,7 +48,7 @@ class ModelHealthMonitor:
     def __init__(self):
         self.free_models = []
         self.last_update = 0
-        
+
     def get_health_log_path(self):
         drive_root = os.getenv('DRIVE_ROOT', '/app/data')
         return os.path.join(drive_root, 'logs/model_health.jsonl')
@@ -39,14 +59,24 @@ class ModelHealthMonitor:
 
     def refresh_available_models(self) -> List[Dict]:
         """Fetch all models and filter free ones"""
-        client = OpenRouterClient()
-        response = client.models.list()
-        
-        free_models = [
-            m for m in response.models 
-            if any(kw in m['id'].lower() for kw in FREE_MODEL_KEYWORDS)
-        ]
-        return free_models
+        api_key = get_openrouter_api_key()
+        if not api_key:
+            return []
+
+        try:
+            response = requests.get(
+                f"{OPENROUTER_API_BASE}/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=10
+            )
+            response.raise_for_status()
+            return [
+                m for m in response.json()['data']
+                if any(kw in m['id'].lower() for kw in FREE_MODEL_KEYWORDS)
+            ]
+        except Exception as e:
+            logger.error(f"Failed to fetch models: {str(e)}")
+            return []
 
     def update_working_models(self) -> Dict[str, List[str]]:
         """Refresh working model list and update env variables"""
