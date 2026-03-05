@@ -20,14 +20,14 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> pathlib.Path:
-    """Safely calculate relative path with automatic Path conversion."""
+def safe_relpath(path: Union[str, pathlib.Path], base: Optional[Union[str, pathlib.Path]] = None) -> str:
+    """Safely calculate relative path as string, handling both str and Path inputs."""
     path_obj = pathlib.Path(path)
     base_obj = pathlib.Path(base) if base else pathlib.Path.cwd()
     try:
-        return path_obj.relative_to(base_obj)
+        return str(path_obj.relative_to(base_obj))
     except ValueError:
-        return path_obj
+        return str(path_obj)
 
 def run_cmd(cmd: List[str], cwd: Optional[str] = None) -> str:
     """Run shell command and return stdout."""
